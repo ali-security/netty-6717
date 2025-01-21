@@ -77,6 +77,7 @@ public final class KQueueIoHandler implements IoHandler {
             return kqueueWaitNow();
         }
     };
+    private final IoEventLoop eventLoop;
     private final IntObjectMap<DefaultKqueueIoRegistration> registrations = new IntObjectHashMap<>(4096);
     private int numChannels;
 
@@ -96,15 +97,11 @@ public final class KQueueIoHandler implements IoHandler {
                                               final SelectStrategyFactory selectStrategyFactory) {
         ObjectUtil.checkPositiveOrZero(maxEvents, "maxEvents");
         ObjectUtil.checkNotNull(selectStrategyFactory, "selectStrategyFactory");
-        return new IoHandlerFactory() {
-            @Override
-            public IoHandler newHandler() {
-                return new KQueueIoHandler(maxEvents, selectStrategyFactory.newSelectStrategy());
-            }
-        };
+        return eventLoop -> new KQueueIoHandler(eventLoop, maxEvents, selectStrategyFactory.newSelectStrategy());
     }
 
-    private KQueueIoHandler(int maxEvents, SelectStrategy strategy) {
+    private KQueueIoHandler(IoEventLoop eventLoop, int maxEvents, SelectStrategy strategy) {
+        this.eventLoop = eventLoop;
         this.selectStrategy = ObjectUtil.checkNotNull(strategy, "strategy");
         this.kqueueFd = Native.newKQueue();
         if (maxEvents == 0) {
@@ -131,13 +128,13 @@ public final class KQueueIoHandler implements IoHandler {
     }
 
     @Override
-    public void wakeup(IoEventLoop eventLoop) {
+    public void wakeup() {
         if (!eventLoop.inEventLoop() && WAKEN_UP_UPDATER.compareAndSet(this, 0, 1)) {
-            wakeup();
+            wakeup0();
         }
     }
 
-    private void wakeup() {
+    private void wakeup0() {
         Native.keventTriggerUserEvent(kqueueFd.intValue(), KQUEUE_WAKE_UP_IDENT);
         // Note that the result may return an error (e.g. errno = EBADF after the event loop has been shutdown).
         // So it is not very practical to assert the return value is always >= 0.
@@ -237,7 +234,7 @@ public final class KQueueIoHandler implements IoHandler {
                     // (OK - no wake-up required).
 
                     if (wakenUp == 1) {
-                        wakeup();
+                        wakeup0();
                     }
                     // fall-through
                 default:
@@ -325,7 +322,7 @@ public final class KQueueIoHandler implements IoHandler {
     }
 
     @Override
-    public KQueueIoRegistration register(IoEventLoop eventLoop, IoHandle handle) {
+    public KQueueIoRegistration register(IoHandle handle) {
         final KQueueIoHandle kqueueHandle = cast(handle);
         if (kqueueHandle.ident() == KQUEUE_WAKE_UP_IDENT) {
             throw new IllegalArgumentException("ident " + KQUEUE_WAKE_UP_IDENT + " is reserved for internal usage");

@@ -83,6 +83,7 @@ public class EpollIoHandler implements IoHandler {
             return epollWaitNow();
         }
     };
+    private final IoEventLoop eventLoop;
 
     private static final long AWAKE = -1L;
     private static final long NONE = Long.MAX_VALUE;
@@ -113,16 +114,12 @@ public class EpollIoHandler implements IoHandler {
                                               final SelectStrategyFactory selectStrategyFactory) {
         ObjectUtil.checkPositiveOrZero(maxEvents, "maxEvents");
         ObjectUtil.checkNotNull(selectStrategyFactory, "selectStrategyFactory");
-        return new IoHandlerFactory() {
-            @Override
-            public IoHandler newHandler() {
-                return new EpollIoHandler(maxEvents, selectStrategyFactory.newSelectStrategy());
-            }
-        };
+        return eventLoop -> new EpollIoHandler(eventLoop, maxEvents, selectStrategyFactory.newSelectStrategy());
     }
 
     // Package-private for testing
-    EpollIoHandler(int maxEvents, SelectStrategy strategy) {
+    EpollIoHandler(IoEventLoop eventLoop, int maxEvents, SelectStrategy strategy) {
+        this.eventLoop = eventLoop;
         selectStrategy = ObjectUtil.checkNotNull(strategy, "strategy");
         if (maxEvents == 0) {
             allowGrowing = true;
@@ -221,7 +218,7 @@ public class EpollIoHandler implements IoHandler {
     }
 
     @Override
-    public void wakeup(IoEventLoop eventLoop) {
+    public void wakeup() {
         if (!eventLoop.inEventLoop() && nextWakeupNanos.getAndSet(AWAKE) != AWAKE) {
             // write to the evfd which will then wake-up epoll_wait(...)
             Native.eventFdWrite(eventFd.intValue(), 1L);
@@ -343,7 +340,7 @@ public class EpollIoHandler implements IoHandler {
     }
 
     @Override
-    public EpollIoRegistration register(IoEventLoop eventLoop, IoHandle handle)
+    public EpollIoRegistration register(IoHandle handle)
             throws Exception {
         final EpollIoHandle epollHandle = cast(handle);
         DefaultEpollIoRegistration registration = new DefaultEpollIoRegistration(eventLoop, epollHandle);

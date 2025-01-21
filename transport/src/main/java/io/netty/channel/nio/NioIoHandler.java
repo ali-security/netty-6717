@@ -112,11 +112,13 @@ public final class NioIoHandler implements IoHandler {
     private final AtomicBoolean wakenUp = new AtomicBoolean();
 
     private final SelectStrategy selectStrategy;
+    private final IoEventLoop eventLoop;
     private int cancelledKeys;
     private boolean needsToSelectAgain;
 
-    private NioIoHandler(SelectorProvider selectorProvider,
+    private NioIoHandler(IoEventLoop eventLoop, SelectorProvider selectorProvider,
                          SelectStrategy strategy) {
+        this.eventLoop = eventLoop;
         this.provider = ObjectUtil.checkNotNull(selectorProvider, "selectorProvider");
         this.selectStrategy = ObjectUtil.checkNotNull(strategy, "selectStrategy");
         final SelectorTuple selectorTuple = openSelector();
@@ -393,7 +395,7 @@ public final class NioIoHandler implements IoHandler {
     }
 
     @Override
-    public NioIoRegistration register(IoEventLoop eventLoop, IoHandle handle)
+    public NioIoRegistration register(IoHandle handle)
             throws Exception {
         NioIoHandle nioHandle = nioHandle(handle);
         NioIoOps ops = NioIoOps.NONE;
@@ -601,7 +603,7 @@ public final class NioIoHandler implements IoHandler {
     }
 
     @Override
-    public void wakeup(IoEventLoop eventLoop) {
+    public void wakeup() {
         if (!eventLoop.inEventLoop() && wakenUp.compareAndSet(false, true)) {
             selector.wakeup();
         }
@@ -764,11 +766,6 @@ public final class NioIoHandler implements IoHandler {
                                               final SelectStrategyFactory selectStrategyFactory) {
         ObjectUtil.checkNotNull(selectorProvider, "selectorProvider");
         ObjectUtil.checkNotNull(selectStrategyFactory, "selectStrategyFactory");
-        return new IoHandlerFactory() {
-            @Override
-            public IoHandler newHandler() {
-                return new NioIoHandler(selectorProvider, selectStrategyFactory.newSelectStrategy());
-            }
-        };
+        return eventLoop ->  new NioIoHandler(eventLoop, selectorProvider, selectStrategyFactory.newSelectStrategy());
     }
 }

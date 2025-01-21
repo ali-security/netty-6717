@@ -32,20 +32,18 @@ import java.util.concurrent.locks.LockSupport;
 
 public final class LocalIoHandler implements IoHandler {
     private final Set<LocalIoHandle> registeredChannels = new HashSet<LocalIoHandle>(64);
+    private final IoEventLoop eventLoop;
     private volatile Thread executionThread;
 
-    private LocalIoHandler() { }
+    private LocalIoHandler(IoEventLoop eventLoop) {
+        this.eventLoop = eventLoop;
+    }
 
     /**
      * Returns a new {@link IoHandlerFactory} that creates {@link LocalIoHandler} instances.
      */
     public static IoHandlerFactory newFactory() {
-        return new IoHandlerFactory() {
-            @Override
-            public IoHandler newHandler() {
-                return new LocalIoHandler();
-            }
-        };
+        return LocalIoHandler::new;
     }
 
     private static LocalIoHandle cast(IoHandle handle) {
@@ -68,7 +66,7 @@ public final class LocalIoHandler implements IoHandler {
     }
 
     @Override
-    public void wakeup(IoEventLoop eventLoop) {
+    public void wakeup() {
         if (!eventLoop.inEventLoop()) {
             Thread thread = executionThread;
             if (thread != null) {
@@ -91,7 +89,7 @@ public final class LocalIoHandler implements IoHandler {
     }
 
     @Override
-    public IoRegistration register(IoEventLoop eventLoop, IoHandle handle) {
+    public IoRegistration register(IoHandle handle) {
         LocalIoHandle localHandle = cast(handle);
         if (registeredChannels.add(localHandle)) {
             LocalIoRegistration registration = new LocalIoRegistration(eventLoop, localHandle);

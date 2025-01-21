@@ -30,26 +30,35 @@ public class SingleThreadIoEventLoopTest {
 
     @Test
     void testIsIoType() {
-        IoHandler handler = new TestIoHandler();
-        IoHandler handler2 = new TestIoHandler() { };
+        class TestIoHandler2 extends TestIoHandler {
+            TestIoHandler2(IoEventLoop eventLoop) {
+                super(eventLoop);
+            }
+        }
 
-        IoEventLoopGroup group = new SingleThreadIoEventLoop(null, Executors.defaultThreadFactory(), handler);
-        assertTrue(group.isIoType(handler.getClass()));
-        assertFalse(group.isIoType(handler2.getClass()));
+        IoEventLoopGroup group = new SingleThreadIoEventLoop(null,
+                Executors.defaultThreadFactory(), TestIoHandler::new);
+        assertTrue(group.isIoType(TestIoHandler.class));
+        assertFalse(group.isIoType(TestIoHandler2.class));
         group.shutdownGracefully();
     }
 
     @Test
     void testIsCompatible() {
-        IoHandler handler = new TestIoHandler() {
+        class CompatibleTestIoHandler extends TestIoHandler {
+            CompatibleTestIoHandler(IoEventLoop eventLoop) {
+                super(eventLoop);
+            }
+
             @Override
             public boolean isCompatible(Class<? extends IoHandle> handleType) {
                 return handleType.equals(TestIoHandle.class);
             }
-        };
+        }
 
         IoHandle handle = new TestIoHandle() { };
-        IoEventLoopGroup group = new SingleThreadIoEventLoop(null, Executors.defaultThreadFactory(), handler);
+        IoEventLoopGroup group = new SingleThreadIoEventLoop(null,
+                Executors.defaultThreadFactory(), CompatibleTestIoHandler::new);
         assertTrue(group.isCompatible(TestIoHandle.class));
         assertFalse(group.isCompatible(handle.getClass()));
         group.shutdownGracefully();
@@ -68,13 +77,13 @@ public class SingleThreadIoEventLoopTest {
     @Test
     void testSuspendingWhileRegistrationActive() throws Exception {
         TestThreadFactory threadFactory = new TestThreadFactory();
-        IoHandler handler = new TestIoHandler() {
+        IoHandler handler = new TestIoHandler(null) {
             @Override
             public boolean isCompatible(Class<? extends IoHandle> handleType) {
                 return true;
             }
         };
-        IoEventLoop loop = new SingleThreadIoEventLoop(null, threadFactory, handler);
+        IoEventLoop loop = new SingleThreadIoEventLoop(null, threadFactory, eventLoop -> handler);
         assertFalse(loop.isSuspended());
         IoRegistration registration = loop.register(new TestIoHandle()).sync().getNow();
         Thread currentThread = threadFactory.threads.take();
@@ -96,6 +105,12 @@ public class SingleThreadIoEventLoopTest {
 
     private static class TestIoHandler implements IoHandler {
         private final Semaphore semaphore = new Semaphore(0);
+        private final IoEventLoop eventLoop;
+
+        TestIoHandler(IoEventLoop eventLoop) {
+            this.eventLoop = eventLoop;
+        }
+
         @Override
         public void prepareToDestroy() {
             // NOOP
@@ -107,7 +122,7 @@ public class SingleThreadIoEventLoopTest {
         }
 
         @Override
-        public IoRegistration register(final IoEventLoop eventLoop, final IoHandle handle) {
+        public IoRegistration register(final IoHandle handle) {
             return new IoRegistration() {
                 private final Promise<?> cancellationPromise = eventLoop.newPromise();
                 @Override
@@ -133,7 +148,7 @@ public class SingleThreadIoEventLoopTest {
         }
 
         @Override
-        public void wakeup(IoEventLoop eventLoop) {
+        public void wakeup() {
             semaphore.release();
         }
 

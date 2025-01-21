@@ -36,7 +36,7 @@ public class IoUringIoHandlerTest {
         config.setMaxBoundedWorker(2)
                 .setMaxUnboundedWorker(2);
         IoHandlerFactory ioHandlerFactory = IoUringIoHandler.newFactory(config);
-        IoHandler handler = ioHandlerFactory.newHandler();
+        IoHandler handler = ioHandlerFactory.newHandler(null);
         handler.run(new IoExecutionContext() {
             @Override
             public boolean canBlock() {

@@ -75,10 +75,11 @@ public final class IoUringIoHandler implements IoHandler {
     private static final int INVALID_ID = 0;
 
     private final CompletionBuffer completionBuffer;
-
-    IoUringIoHandler(IoUringIoHandlerConfiguration config) {
+    private final IoEventLoop eventLoop;
+    IoUringIoHandler(IoEventLoop eventLoop, IoUringIoHandlerConfiguration config) {
         // Ensure that we load all native bits as otherwise it may fail when try to use native methods in IovArray
         IoUring.ensureAvailability();
+        this.eventLoop = eventLoop;
         requireNonNull(config, "config");
         this.ringBuffer = Native.createRingBuffer(config.getRingSize(), Native.setupFlags());
         if (IoUring.isRegisterIowqMaxWorkersSupported() && config.needRegisterIowqMaxWorker()) {
@@ -341,7 +342,7 @@ public final class IoUringIoHandler implements IoHandler {
     }
 
     @Override
-    public IoRegistration register(IoEventLoop eventLoop, IoHandle handle) throws Exception {
+    public IoRegistration register(IoHandle handle) throws Exception {
         IoUringIoHandle ioHandle = cast(handle);
         if (shuttingDown) {
             throw new RejectedExecutionException("IoEventLoop is shutting down");
@@ -481,7 +482,7 @@ public final class IoUringIoHandler implements IoHandler {
     }
 
     @Override
-    public void wakeup(IoEventLoop eventLoop) {
+    public void wakeup() {
         if (!eventLoop.inEventLoop() && !eventfdAsyncNotify.getAndSet(true)) {
             // write to the eventfd which will then trigger an eventfd read completion.
             Native.eventFdWrite(eventfd.intValue(), 1L);
@@ -526,7 +527,7 @@ public final class IoUringIoHandler implements IoHandler {
     public static IoHandlerFactory newFactory(int ringSize) {
         IoUringIoHandlerConfiguration configuration = new IoUringIoHandlerConfiguration();
         configuration.setRingSize(ringSize);
-        return () -> new IoUringIoHandler(configuration);
+        return eventLoop -> new IoUringIoHandler(eventLoop, configuration);
     }
 
     /**
@@ -538,7 +539,6 @@ public final class IoUringIoHandler implements IoHandler {
     public static IoHandlerFactory newFactory(IoUringIoHandlerConfiguration config) {
         IoUring.ensureAvailability();
         ObjectUtil.checkNotNull(config, "config");
-        return () -> new IoUringIoHandler(config);
+        return eventLoop -> new IoUringIoHandler(eventLoop, config);
     }
-
 }
