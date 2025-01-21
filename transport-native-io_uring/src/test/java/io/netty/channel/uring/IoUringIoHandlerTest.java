@@ -45,22 +45,7 @@ public class IoUringIoHandlerTest {
                 .setMaxUnboundedWorker(2);
         IoHandlerFactory ioHandlerFactory = IoUringIoHandler.newFactory(config);
         IoHandler handler = ioHandlerFactory.newHandler(eventLoop);
-        handler.run(new IoExecutionContext() {
-            @Override
-            public boolean canBlock() {
-                return false;
-            }
-
-            @Override
-            public long delayNanos(long currentTimeNanos) {
-                return 0;
-            }
-
-            @Override
-            public long deadlineNanos() {
-                return 0;
-            }
-        });
+        handler.initialize();
         handler.destroy();
         eventLoop.shutdownGracefully();
     }

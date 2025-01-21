@@ -28,6 +28,12 @@ package io.netty.channel;
  *
  */
 public interface IoHandler {
+
+    /**
+     * Initialize this {@link IoHandler}.
+     */
+    default void initialize() {}
+
     /**
      * Run the IO handled by this {@link IoHandler}. The {@link IoExecutionContext} should be used
      * to ensure we not execute too long and so block the processing of other task that are

@@ -174,6 +174,7 @@ public class SingleThreadIoEventLoop extends SingleThreadEventLoop implements Io
     @Override
     protected void run() {
         assert inEventLoop();
+        ioHandler.initialize();
         do {
             runIo();
             if (isShuttingDown()) {
