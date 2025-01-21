@@ -101,7 +101,7 @@ public final class KQueueIoHandler implements IoHandler {
     }
 
     private KQueueIoHandler(IoEventLoop eventLoop, int maxEvents, SelectStrategy strategy) {
-        this.eventLoop = eventLoop;
+        this.eventLoop = ObjectUtil.checkNotNull(eventLoop, "eventLoop");
         this.selectStrategy = ObjectUtil.checkNotNull(strategy, "strategy");
         this.kqueueFd = Native.newKQueue();
         if (maxEvents == 0) {

@@ -79,7 +79,7 @@ public final class IoUringIoHandler implements IoHandler {
     IoUringIoHandler(IoEventLoop eventLoop, IoUringIoHandlerConfiguration config) {
         // Ensure that we load all native bits as otherwise it may fail when try to use native methods in IovArray
         IoUring.ensureAvailability();
-        this.eventLoop = eventLoop;
+        this.eventLoop = requireNonNull(eventLoop, "eventLoop");
         requireNonNull(config, "config");
         this.ringBuffer = Native.createRingBuffer(config.getRingSize(), Native.setupFlags());
         if (IoUring.isRegisterIowqMaxWorkersSupported() && config.needRegisterIowqMaxWorker()) {

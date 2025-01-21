@@ -119,7 +119,7 @@ public class EpollIoHandler implements IoHandler {
 
     // Package-private for testing
     EpollIoHandler(IoEventLoop eventLoop, int maxEvents, SelectStrategy strategy) {
-        this.eventLoop = eventLoop;
+        this.eventLoop = ObjectUtil.checkNotNull(eventLoop, "eventLoop");
         selectStrategy = ObjectUtil.checkNotNull(strategy, "strategy");
         if (maxEvents == 0) {
             allowGrowing = true;

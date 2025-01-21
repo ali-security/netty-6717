@@ -27,6 +27,7 @@ import io.netty.util.concurrent.Promise;
 import io.netty.util.internal.StringUtil;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.locks.LockSupport;
 
@@ -36,7 +37,7 @@ public final class LocalIoHandler implements IoHandler {
     private volatile Thread executionThread;
 
     private LocalIoHandler(IoEventLoop eventLoop) {
-        this.eventLoop = eventLoop;
+        this.eventLoop = Objects.requireNonNull(eventLoop, "eventLoop");
     }
 
     /**
