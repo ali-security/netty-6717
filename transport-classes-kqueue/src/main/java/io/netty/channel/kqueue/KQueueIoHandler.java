@@ -97,7 +97,7 @@ public final class KQueueIoHandler implements IoHandler {
                                               final SelectStrategyFactory selectStrategyFactory) {
         ObjectUtil.checkPositiveOrZero(maxEvents, "maxEvents");
         ObjectUtil.checkNotNull(selectStrategyFactory, "selectStrategyFactory");
-        return context -> new KQueueIoHandler(context, maxEvents, selectStrategyFactory.newSelectStrategy());
+        return executor -> new KQueueIoHandler(executor, maxEvents, selectStrategyFactory.newSelectStrategy());
     }
 
     private KQueueIoHandler(IoExecutor executor, int maxEvents, SelectStrategy strategy) {

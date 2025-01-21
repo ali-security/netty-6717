@@ -75,6 +75,7 @@ public final class IoUringIoHandler implements IoHandler {
 
     private final CompletionBuffer completionBuffer;
     private final IoExecutor executor;
+
     IoUringIoHandler(IoExecutor executor, IoUringIoHandlerConfiguration config) {
         // Ensure that we load all native bits as otherwise it may fail when try to use native methods in IovArray
         IoUring.ensureAvailability();
