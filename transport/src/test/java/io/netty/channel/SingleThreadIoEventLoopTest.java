@@ -78,13 +78,13 @@ public class SingleThreadIoEventLoopTest {
     @Test
     void testSuspendingWhileRegistrationActive() throws Exception {
         TestThreadFactory threadFactory = new TestThreadFactory();
-        IoHandler handler = new TestIoHandler(null) {
+        IoEventLoop loop = new SingleThreadIoEventLoop(null, threadFactory,
+                eventLoop -> new TestIoHandler(eventLoop) {
             @Override
             public boolean isCompatible(Class<? extends IoHandle> handleType) {
                 return true;
             }
-        };
-        IoEventLoop loop = new SingleThreadIoEventLoop(null, threadFactory, eventLoop -> handler);
+        });
         assertFalse(loop.isSuspended());
         IoRegistration registration = loop.register(new TestIoHandle()).sync().getNow();
         Thread currentThread = threadFactory.threads.take();
