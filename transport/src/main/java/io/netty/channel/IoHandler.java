@@ -16,7 +16,7 @@
 package io.netty.channel;
 
 /**
- * Handles IO dispatching for an {@link IoExecutionContext}
+ * Handles IO dispatching for an {@link IoExecutionContext}.
  * All operations except {@link #wakeup()} and {@link #isCompatible(Class)} <strong>MUST</strong> be executed
  * on the {@link IoExecutionContext} thread (which means {@link IoExecutionContext#inExecutionThread(Thread)} must
  * return {@code true}) and should never be called from the user-directly.

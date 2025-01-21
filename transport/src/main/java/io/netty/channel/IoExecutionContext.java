@@ -21,7 +21,6 @@ import java.util.concurrent.Executor;
 
 /**
  * The execution context for an {@link IoHandler}.
- * All methods must be called from the {@link IoEventLoop} thread.
  */
 public interface IoExecutionContext extends Executor {
     /**
