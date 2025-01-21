@@ -43,18 +43,19 @@ public class SingleThreadIoEventLoopTest {
         group.shutdownGracefully();
     }
 
+    static final class CompatibleTestIoHandler extends TestIoHandler {
+        CompatibleTestIoHandler(IoEventLoop eventLoop) {
+            super(eventLoop);
+        }
+
+        @Override
+        public boolean isCompatible(Class<? extends IoHandle> handleType) {
+            return handleType.equals(TestIoHandle.class);
+        }
+    }
+
     @Test
     void testIsCompatible() {
-        class CompatibleTestIoHandler extends TestIoHandler {
-            CompatibleTestIoHandler(IoEventLoop eventLoop) {
-                super(eventLoop);
-            }
-
-            @Override
-            public boolean isCompatible(Class<? extends IoHandle> handleType) {
-                return handleType.equals(TestIoHandle.class);
-            }
-        }
 
         IoHandle handle = new TestIoHandle() { };
         IoEventLoopGroup group = new SingleThreadIoEventLoop(null,
