@@ -18,7 +18,6 @@ package io.netty.channel.kqueue;
 import io.netty.channel.Channel;
 import io.netty.channel.DefaultSelectStrategyFactory;
 import io.netty.channel.EventLoop;
-import io.netty.channel.IoEventLoop;
 import io.netty.channel.IoExecutionContext;
 import io.netty.channel.IoHandle;
 import io.netty.channel.IoHandler;
@@ -77,7 +76,7 @@ public final class KQueueIoHandler implements IoHandler {
             return kqueueWaitNow();
         }
     };
-    private final IoEventLoop eventLoop;
+    private final IoExecutionContext executionContext;
     private final IntObjectMap<DefaultKqueueIoRegistration> registrations = new IntObjectHashMap<>(4096);
     private int numChannels;
 
@@ -97,11 +96,11 @@ public final class KQueueIoHandler implements IoHandler {
                                               final SelectStrategyFactory selectStrategyFactory) {
         ObjectUtil.checkPositiveOrZero(maxEvents, "maxEvents");
         ObjectUtil.checkNotNull(selectStrategyFactory, "selectStrategyFactory");
-        return eventLoop -> new KQueueIoHandler(eventLoop, maxEvents, selectStrategyFactory.newSelectStrategy());
+        return context -> new KQueueIoHandler(context, maxEvents, selectStrategyFactory.newSelectStrategy());
     }
 
-    private KQueueIoHandler(IoEventLoop eventLoop, int maxEvents, SelectStrategy strategy) {
-        this.eventLoop = ObjectUtil.checkNotNull(eventLoop, "eventLoop");
+    private KQueueIoHandler(IoExecutionContext executionContext, int maxEvents, SelectStrategy strategy) {
+        this.executionContext = ObjectUtil.checkNotNull(executionContext, "executionContext");
         this.selectStrategy = ObjectUtil.checkNotNull(strategy, "strategy");
         this.kqueueFd = Native.newKQueue();
         if (maxEvents == 0) {
@@ -129,7 +128,8 @@ public final class KQueueIoHandler implements IoHandler {
 
     @Override
     public void wakeup() {
-        if (!eventLoop.inEventLoop() && WAKEN_UP_UPDATER.compareAndSet(this, 0, 1)) {
+        if (!executionContext.inExecutionThread(Thread.currentThread())
+                && WAKEN_UP_UPDATER.compareAndSet(this, 0, 1)) {
             wakeup0();
         }
     }
@@ -191,10 +191,10 @@ public final class KQueueIoHandler implements IoHandler {
     }
 
     @Override
-    public int run(IoExecutionContext context) {
+    public int run() {
         int handled = 0;
         try {
-            int strategy = selectStrategy.calculateStrategy(selectNowSupplier, !context.canBlock());
+            int strategy = selectStrategy.calculateStrategy(selectNowSupplier, !executionContext.canBlock());
             switch (strategy) {
                 case SelectStrategy.CONTINUE:
                     return 0;
@@ -203,7 +203,7 @@ public final class KQueueIoHandler implements IoHandler {
                     // fall-through to SELECT since the busy-wait is not supported with kqueue
 
                 case SelectStrategy.SELECT:
-                    strategy = kqueueWait(context, WAKEN_UP_UPDATER.getAndSet(this, 0) == 1);
+                    strategy = kqueueWait(executionContext, WAKEN_UP_UPDATER.getAndSet(this, 0) == 1);
 
                     // 'wakenUp.compareAndSet(false, true)' is always evaluated
                     // before calling 'selector.wakeup()' to reduce the wake-up
@@ -329,7 +329,7 @@ public final class KQueueIoHandler implements IoHandler {
         }
 
         DefaultKqueueIoRegistration registration = new DefaultKqueueIoRegistration(
-                eventLoop, kqueueHandle);
+                executionContext, kqueueHandle);
         DefaultKqueueIoRegistration old = registrations.put(kqueueHandle.ident(), registration);
         if (old != null) {
             // restore old mapping and throw exception
@@ -368,12 +368,12 @@ public final class KQueueIoHandler implements IoHandler {
 
         final KQueueIoHandle handle;
 
-        private final IoEventLoop eventLoop;
+        private final IoExecutionContext context;
 
-        DefaultKqueueIoRegistration(IoEventLoop eventLoop, KQueueIoHandle handle) {
-            this.eventLoop = eventLoop;
+        DefaultKqueueIoRegistration(IoExecutionContext context, KQueueIoHandle handle) {
+            this.context = context;
             this.handle = handle;
-            this.cancellationPromise = eventLoop.newPromise();
+            this.cancellationPromise = context.newPromise();
         }
 
         @Override
@@ -385,10 +385,10 @@ public final class KQueueIoHandler implements IoHandler {
             short filter = kQueueIoOps.filter();
             short flags = kQueueIoOps.flags();
             int fflags = kQueueIoOps.fflags();
-            if (eventLoop.inEventLoop()) {
+            if (context.inExecutionThread(Thread.currentThread())) {
                 evSet(filter, flags, fflags);
             } else {
-                eventLoop.execute(() -> evSet(filter, flags, fflags));
+                context.execute(() -> evSet(filter, flags, fflags));
             }
             return 0;
         }
@@ -412,10 +412,10 @@ public final class KQueueIoHandler implements IoHandler {
             if (!cancellationPromise.trySuccess(null)) {
                 return;
             }
-            if (eventLoop.inEventLoop()) {
+            if (context.inExecutionThread(Thread.currentThread())) {
                 cancel0();
             } else {
-                eventLoop.execute(this::cancel0);
+                context.execute(this::cancel0);
             }
         }
 

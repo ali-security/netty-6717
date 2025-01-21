@@ -57,6 +57,21 @@ public class SingleThreadIoEventLoop extends SingleThreadEventLoop implements Io
             assert inEventLoop();
             return SingleThreadIoEventLoop.this.deadlineNanos();
         }
+
+        @Override
+        public boolean inExecutionThread(Thread currentThread) {
+            return SingleThreadIoEventLoop.this.inEventLoop(currentThread);
+        }
+
+        @Override
+        public <V> Promise<V> newPromise() {
+            return SingleThreadIoEventLoop.this.newPromise();
+        }
+
+        @Override
+        public void execute(Runnable command) {
+            SingleThreadIoEventLoop.this.execute(command);
+        }
     };
 
     private final IoHandler ioHandler;
@@ -79,7 +94,7 @@ public class SingleThreadIoEventLoop extends SingleThreadEventLoop implements Io
                                    IoHandlerFactory ioHandlerFactory) {
         super(parent, threadFactory, false, true);
         this.maxTaskProcessingQuantumNs = DEFAULT_MAX_TASK_PROCESSING_QUANTUM_NS;
-        this.ioHandler = ObjectUtil.checkNotNull(ioHandlerFactory, "ioHandlerFactory").newHandler(this);
+        this.ioHandler = ObjectUtil.checkNotNull(ioHandlerFactory, "ioHandlerFactory").newHandler(context);
     }
 
     /**
@@ -93,7 +108,7 @@ public class SingleThreadIoEventLoop extends SingleThreadEventLoop implements Io
     public SingleThreadIoEventLoop(IoEventLoopGroup parent, Executor executor, IoHandlerFactory ioHandlerFactory) {
         super(parent, executor, false, true);
         this.maxTaskProcessingQuantumNs = DEFAULT_MAX_TASK_PROCESSING_QUANTUM_NS;
-        this.ioHandler = ObjectUtil.checkNotNull(ioHandlerFactory, "ioHandlerFactory").newHandler(this);
+        this.ioHandler = ObjectUtil.checkNotNull(ioHandlerFactory, "ioHandlerFactory").newHandler(context);
     }
 
     /**
@@ -120,7 +135,7 @@ public class SingleThreadIoEventLoop extends SingleThreadEventLoop implements Io
         this.maxTaskProcessingQuantumNs =
                 ObjectUtil.checkPositiveOrZero(maxTaskProcessingQuantumMs, "maxTaskProcessingQuantumMs") == 0 ?
                         DEFAULT_MAX_TASK_PROCESSING_QUANTUM_NS : maxTaskProcessingQuantumMs;
-        this.ioHandler = ObjectUtil.checkNotNull(ioHandlerFactory, "ioHandlerFactory").newHandler(this);
+        this.ioHandler = ObjectUtil.checkNotNull(ioHandlerFactory, "ioHandlerFactory").newHandler(context);
     }
 
     /**
@@ -146,7 +161,7 @@ public class SingleThreadIoEventLoop extends SingleThreadEventLoop implements Io
         this.maxTaskProcessingQuantumNs =
                 ObjectUtil.checkPositiveOrZero(maxTaskProcessingQuantumMs, "maxTaskProcessingQuantumMs") == 0 ?
                         DEFAULT_MAX_TASK_PROCESSING_QUANTUM_NS : maxTaskProcessingQuantumMs;
-        this.ioHandler = ObjectUtil.checkNotNull(ioHandlerFactory, "ioHandlerFactory").newHandler(this);
+        this.ioHandler = ObjectUtil.checkNotNull(ioHandlerFactory, "ioHandlerFactory").newHandler(context);
     }
 
     /**
@@ -168,7 +183,7 @@ public class SingleThreadIoEventLoop extends SingleThreadEventLoop implements Io
                                       RejectedExecutionHandler rejectedExecutionHandler) {
         super(parent, executor, false, true, taskQueue, tailTaskQueue, rejectedExecutionHandler);
         this.maxTaskProcessingQuantumNs = DEFAULT_MAX_TASK_PROCESSING_QUANTUM_NS;
-        this.ioHandler = ObjectUtil.checkNotNull(ioHandlerFactory, "ioHandlerFactory").newHandler(this);
+        this.ioHandler = ObjectUtil.checkNotNull(ioHandlerFactory, "ioHandlerFactory").newHandler(context);
     }
 
     @Override
@@ -205,7 +220,7 @@ public class SingleThreadIoEventLoop extends SingleThreadEventLoop implements Io
      */
     protected int runIo() {
         assert inEventLoop();
-        return ioHandler.run(context);
+        return ioHandler.run();
     }
 
     @Override

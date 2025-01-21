@@ -31,8 +31,8 @@ public class SingleThreadIoEventLoopTest {
     @Test
     void testIsIoType() {
         class TestIoHandler2 extends TestIoHandler {
-            TestIoHandler2(IoEventLoop eventLoop) {
-                super(eventLoop);
+            TestIoHandler2(IoExecutionContext context) {
+                super(context);
             }
         }
 
@@ -44,8 +44,8 @@ public class SingleThreadIoEventLoopTest {
     }
 
     static final class CompatibleTestIoHandler extends TestIoHandler {
-        CompatibleTestIoHandler(IoEventLoop eventLoop) {
-            super(eventLoop);
+        CompatibleTestIoHandler(IoExecutionContext context) {
+            super(context);
         }
 
         @Override
@@ -106,10 +106,10 @@ public class SingleThreadIoEventLoopTest {
 
     private static class TestIoHandler implements IoHandler {
         private final Semaphore semaphore = new Semaphore(0);
-        private final IoEventLoop eventLoop;
+        private final IoExecutionContext context;
 
-        TestIoHandler(IoEventLoop eventLoop) {
-            this.eventLoop = eventLoop;
+        TestIoHandler(IoExecutionContext context) {
+            this.context = context;
         }
 
         @Override
@@ -125,7 +125,7 @@ public class SingleThreadIoEventLoopTest {
         @Override
         public IoRegistration register(final IoHandle handle) {
             return new IoRegistration() {
-                private final Promise<?> cancellationPromise = eventLoop.newPromise();
+                private final Promise<?> cancellationPromise = context.newPromise();
                 @Override
                 public long submit(IoOps ops) {
                     return 0;
@@ -154,7 +154,7 @@ public class SingleThreadIoEventLoopTest {
         }
 
         @Override
-        public int run(IoExecutionContext context) {
+        public int run() {
             try {
                 semaphore.acquire();
             } catch (InterruptedException e) {

@@ -15,11 +15,15 @@
  */
 package io.netty.channel;
 
+import io.netty.util.concurrent.Promise;
+
+import java.util.concurrent.Executor;
+
 /**
  * The execution context for an {@link IoHandler}.
  * All methods must be called from the {@link IoEventLoop} thread.
  */
-public interface IoExecutionContext {
+public interface IoExecutionContext extends Executor {
     /**
      * Returns {@code true} if blocking for IO is allowed or if we should try to do a non-blocking request for IO to be
      * ready.
@@ -43,4 +47,14 @@ public interface IoExecutionContext {
      * @return deadline.
      */
     long deadlineNanos();
+
+    /**
+     * Return {@code true} if the given {@link Thread} is used by this {@link IoExecutionContext}.
+     */
+    boolean inExecutionThread(Thread currentThread);
+
+    /**
+     * Return a new {@link Promise}.
+     */
+    <V> Promise<V> newPromise();
 }

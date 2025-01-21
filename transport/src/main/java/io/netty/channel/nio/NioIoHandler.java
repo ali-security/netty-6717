@@ -17,7 +17,6 @@ package io.netty.channel.nio;
 
 import io.netty.channel.ChannelException;
 import io.netty.channel.DefaultSelectStrategyFactory;
-import io.netty.channel.IoEventLoop;
 import io.netty.channel.IoExecutionContext;
 import io.netty.channel.IoHandle;
 import io.netty.channel.IoHandler;
@@ -112,13 +111,13 @@ public final class NioIoHandler implements IoHandler {
     private final AtomicBoolean wakenUp = new AtomicBoolean();
 
     private final SelectStrategy selectStrategy;
-    private final IoEventLoop eventLoop;
+    private final IoExecutionContext executionContext;
     private int cancelledKeys;
     private boolean needsToSelectAgain;
 
-    private NioIoHandler(IoEventLoop eventLoop, SelectorProvider selectorProvider,
+    private NioIoHandler(IoExecutionContext executionContext, SelectorProvider selectorProvider,
                          SelectStrategy strategy) {
-        this.eventLoop = ObjectUtil.checkNotNull(eventLoop, "eventLoop");
+        this.executionContext = ObjectUtil.checkNotNull(executionContext, "executionContext");
         this.provider = ObjectUtil.checkNotNull(selectorProvider, "selectorProvider");
         this.selectStrategy = ObjectUtil.checkNotNull(strategy, "selectStrategy");
         final SelectorTuple selectorTuple = openSelector();
@@ -323,11 +322,11 @@ public final class NioIoHandler implements IoHandler {
         private final NioIoHandle handle;
         private volatile SelectionKey key;
 
-        DefaultNioRegistration(IoEventLoop eventLoop, NioIoHandle handle, NioIoOps initialOps, Selector selector)
+        DefaultNioRegistration(IoExecutionContext context, NioIoHandle handle, NioIoOps initialOps, Selector selector)
                 throws IOException {
             this.handle = handle;
             key = handle.selectableChannel().register(selector, initialOps.value, this);
-            this.cancellationPromise = eventLoop.newPromise();
+            this.cancellationPromise = context.newPromise();
         }
 
         NioIoHandle handle() {
@@ -402,7 +401,7 @@ public final class NioIoHandler implements IoHandler {
         boolean selected = false;
         for (;;) {
             try {
-                return new DefaultNioRegistration(eventLoop, nioHandle, ops, unwrappedSelector());
+                return new DefaultNioRegistration(executionContext, nioHandle, ops, unwrappedSelector());
             } catch (CancelledKeyException e) {
                 if (!selected) {
                     // Force the Selector to select now as the "canceled" SelectionKey may still be
@@ -419,11 +418,11 @@ public final class NioIoHandler implements IoHandler {
     }
 
     @Override
-    public int run(IoExecutionContext runner) {
+    public int run() {
         int handled = 0;
         try {
             try {
-                switch (selectStrategy.calculateStrategy(selectNowSupplier, !runner.canBlock())) {
+                switch (selectStrategy.calculateStrategy(selectNowSupplier, !executionContext.canBlock())) {
                     case SelectStrategy.CONTINUE:
                         return 0;
 
@@ -431,7 +430,7 @@ public final class NioIoHandler implements IoHandler {
                         // fall-through to SELECT since the busy-wait is not supported with NIO
 
                     case SelectStrategy.SELECT:
-                        select(runner, wakenUp.getAndSet(false));
+                        select(executionContext, wakenUp.getAndSet(false));
 
                         // 'wakenUp.compareAndSet(false, true)' is always evaluated
                         // before calling 'selector.wakeup()' to reduce the wake-up
@@ -604,7 +603,7 @@ public final class NioIoHandler implements IoHandler {
 
     @Override
     public void wakeup() {
-        if (!eventLoop.inEventLoop() && wakenUp.compareAndSet(false, true)) {
+        if (!executionContext.inExecutionThread(Thread.currentThread()) && wakenUp.compareAndSet(false, true)) {
             selector.wakeup();
         }
     }
@@ -766,6 +765,6 @@ public final class NioIoHandler implements IoHandler {
                                               final SelectStrategyFactory selectStrategyFactory) {
         ObjectUtil.checkNotNull(selectorProvider, "selectorProvider");
         ObjectUtil.checkNotNull(selectStrategyFactory, "selectStrategyFactory");
-        return eventLoop ->  new NioIoHandler(eventLoop, selectorProvider, selectStrategyFactory.newSelectStrategy());
+        return context ->  new NioIoHandler(context, selectorProvider, selectStrategyFactory.newSelectStrategy());
     }
 }

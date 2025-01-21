@@ -23,8 +23,8 @@ public interface IoHandlerFactory {
     /**
      * Creates a new {@link IoHandler} instance.
      *
-     * @param eventLoop the {@link IoEventLoop} that uses the {@link IoHandler}.
-     * @return          a new {@link IoHandler} instance.
+     * @param executionContext the {@link IoExecutionContext} for the {@link IoHandler}.
+     * @return                 a new {@link IoHandler} instance.
      */
-    IoHandler newHandler(IoEventLoop eventLoop);
+    IoHandler newHandler(IoExecutionContext executionContext);
 }

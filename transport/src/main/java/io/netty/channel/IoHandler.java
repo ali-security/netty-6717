@@ -16,9 +16,10 @@
 package io.netty.channel;
 
 /**
- * Handles IO dispatching for an {@link IoEventLoop}
+ * Handles IO dispatching for an {@link IoExecutionContext}
  * All operations except {@link #wakeup()} and {@link #isCompatible(Class)} <strong>MUST</strong> be executed
- * on the {@link IoEventLoop} thread and should never be called from the user-directly.
+ * on the {@link IoExecutionContext} thread (which means {@link IoExecutionContext#inExecutionThread(Thread)} must
+ * return {@code true}) and should never be called from the user-directly.
  * <p>
  * Once a {@link IoHandle} is registered via the {@link #register(IoHandle)} method it's possible
  * to submit {@link IoOps} related to the {@link IoHandle} via {@link IoRegistration#submit(IoOps)}.
@@ -32,29 +33,29 @@ public interface IoHandler {
     /**
      * Initialize this {@link IoHandler}.
      */
-    default void initialize() {}
+    default void initialize() { }
 
     /**
      * Run the IO handled by this {@link IoHandler}. The {@link IoExecutionContext} should be used
      * to ensure we not execute too long and so block the processing of other task that are
-     * scheduled on the {@link EventLoop}. This is done by taking {@link IoExecutionContext#delayNanos(long)} or
-     * {@link IoExecutionContext#deadlineNanos()} into account.
+     * scheduled on the {@link IoExecutionContext}. This is done by taking {@link IoExecutionContext#delayNanos(long)}
+     * or {@link IoExecutionContext#deadlineNanos()} into account.
      *
      * @return the number of {@link IoHandle} for which I/O was handled.
      */
-    int run(IoExecutionContext context);
+    int run();
 
     /**
      * Prepare to destroy this {@link IoHandler}. This method will be called before {@link #destroy()} and may be
      * called multiple times.
      */
-    void prepareToDestroy();
+    default void prepareToDestroy() { }
 
     /**
      * Destroy the {@link IoHandler} and free all its resources. Once destroyed using the {@link IoHandler} will
      * cause undefined behaviour.
      */
-    void destroy();
+    default void destroy() { }
 
     /**
      * Register a {@link IoHandle} for IO.
