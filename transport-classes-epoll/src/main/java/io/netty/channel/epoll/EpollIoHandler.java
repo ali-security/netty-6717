@@ -18,7 +18,8 @@ package io.netty.channel.epoll;
 import io.netty.channel.Channel;
 import io.netty.channel.DefaultSelectStrategyFactory;
 import io.netty.channel.EventLoop;
-import io.netty.channel.IoExecutionContext;
+import io.netty.channel.IoExecutorContext;
+import io.netty.channel.IoExecutor;
 import io.netty.channel.IoHandle;
 import io.netty.channel.IoHandler;
 import io.netty.channel.IoHandlerFactory;
@@ -82,7 +83,7 @@ public class EpollIoHandler implements IoHandler {
             return epollWaitNow();
         }
     };
-    private final IoExecutionContext executionContext;
+    private final IoExecutor executor;
 
     private static final long AWAKE = -1L;
     private static final long NONE = Long.MAX_VALUE;
@@ -113,12 +114,12 @@ public class EpollIoHandler implements IoHandler {
                                               final SelectStrategyFactory selectStrategyFactory) {
         ObjectUtil.checkPositiveOrZero(maxEvents, "maxEvents");
         ObjectUtil.checkNotNull(selectStrategyFactory, "selectStrategyFactory");
-        return context -> new EpollIoHandler(context, maxEvents, selectStrategyFactory.newSelectStrategy());
+        return executor -> new EpollIoHandler(executor, maxEvents, selectStrategyFactory.newSelectStrategy());
     }
 
     // Package-private for testing
-    EpollIoHandler(IoExecutionContext executionContext, int maxEvents, SelectStrategy strategy) {
-        this.executionContext = ObjectUtil.checkNotNull(executionContext, "executionContext");
+    EpollIoHandler(IoExecutor executor, int maxEvents, SelectStrategy strategy) {
+        this.executor = ObjectUtil.checkNotNull(executor, "executor");
         selectStrategy = ObjectUtil.checkNotNull(strategy, "strategy");
         if (maxEvents == 0) {
             allowGrowing = true;
@@ -218,7 +219,7 @@ public class EpollIoHandler implements IoHandler {
 
     @Override
     public void wakeup() {
-        if (!executionContext.inExecutionThread(Thread.currentThread()) && nextWakeupNanos.getAndSet(AWAKE) != AWAKE) {
+        if (!executor.inExecutorThread(Thread.currentThread()) && nextWakeupNanos.getAndSet(AWAKE) != AWAKE) {
             // write to the evfd which will then wake-up epoll_wait(...)
             Native.eventFdWrite(eventFd.intValue(), 1L);
         }
@@ -255,13 +256,13 @@ public class EpollIoHandler implements IoHandler {
 
     private final class DefaultEpollIoRegistration implements EpollIoRegistration {
         private final Promise<?> cancellationPromise;
-        private final IoExecutionContext context;
+        private final IoExecutor executor;
         final EpollIoHandle handle;
 
-        DefaultEpollIoRegistration(IoExecutionContext context, EpollIoHandle handle) {
-            this.context = context;
+        DefaultEpollIoRegistration(IoExecutor executor, EpollIoHandle handle) {
+            this.executor = executor;
             this.handle = handle;
-            this.cancellationPromise = context.newPromise();
+            this.cancellationPromise = executor.newPromise();
         }
 
         @Override
@@ -295,10 +296,10 @@ public class EpollIoHandler implements IoHandler {
                 // be automatically removed once the file-descriptor is closed.
                 Native.epollCtlDel(epollFd.intValue(), handle.fd().intValue());
             }
-            if (context.inExecutionThread(Thread.currentThread())) {
+            if (executor.inExecutorThread(Thread.currentThread())) {
                 cancel0();
             } else {
-                context.execute(this::cancel0);
+                executor.execute(this::cancel0);
             }
         }
 
@@ -342,7 +343,7 @@ public class EpollIoHandler implements IoHandler {
     public EpollIoRegistration register(IoHandle handle)
             throws Exception {
         final EpollIoHandle epollHandle = cast(handle);
-        DefaultEpollIoRegistration registration = new DefaultEpollIoRegistration(executionContext, epollHandle);
+        DefaultEpollIoRegistration registration = new DefaultEpollIoRegistration(executor, epollHandle);
         int fd = epollHandle.fd().intValue();
         Native.epollCtlAdd(epollFd.intValue(), fd, EpollIoOps.EPOLLERR.value);
         DefaultEpollIoRegistration old = registrations.put(fd, registration);
@@ -381,7 +382,7 @@ public class EpollIoHandler implements IoHandler {
         return Collections.unmodifiableList(channels);
     }
 
-    private long epollWait(IoExecutionContext context, long deadlineNanos) throws IOException {
+    private long epollWait(IoExecutorContext context, long deadlineNanos) throws IOException {
         if (deadlineNanos == NONE) {
             return Native.epollWait(epollFd, events, timerFd,
                     Integer.MAX_VALUE, 0, EPOLL_WAIT_MILLIS_THRESHOLD); // disarm timer
@@ -410,10 +411,10 @@ public class EpollIoHandler implements IoHandler {
     }
 
     @Override
-    public int run() {
+    public int run(IoExecutorContext context) {
         int handled = 0;
         try {
-            int strategy = selectStrategy.calculateStrategy(selectNowSupplier, !executionContext.canBlock());
+            int strategy = selectStrategy.calculateStrategy(selectNowSupplier, !context.canBlock());
             switch (strategy) {
                 case SelectStrategy.CONTINUE:
                     return 0;
@@ -434,25 +435,25 @@ public class EpollIoHandler implements IoHandler {
                         // abnormally failed syscall (the write itself or a prior epoll_wait)
                         logger.warn("Missed eventfd write (not seen after > 1 second)");
                         pendingWakeup = false;
-                        if (!executionContext.canBlock()) {
+                        if (!context.canBlock()) {
                             break;
                         }
                         // fall-through
                     }
 
-                    long curDeadlineNanos = executionContext.deadlineNanos();
+                    long curDeadlineNanos = context.deadlineNanos();
                     if (curDeadlineNanos == -1L) {
                         curDeadlineNanos = NONE; // nothing on the calendar
                     }
                     nextWakeupNanos.set(curDeadlineNanos);
                     try {
-                        if (executionContext.canBlock()) {
+                        if (context.canBlock()) {
                             if (curDeadlineNanos == prevDeadlineNanos) {
                                 // No timer activity needed
                                 strategy = epollWaitNoTimerChange();
                             } else {
                                 // Timerfd needs to be re-armed or disarmed
-                                long result = epollWait(executionContext, curDeadlineNanos);
+                                long result = epollWait(context, curDeadlineNanos);
                                 // The result contains the actual return value and if a timer was used or not.
                                 // We need to "unpack" using the helper methods exposed in Native.
                                 strategy = Native.epollReady(result);

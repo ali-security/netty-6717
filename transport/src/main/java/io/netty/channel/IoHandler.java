@@ -16,9 +16,9 @@
 package io.netty.channel;
 
 /**
- * Handles IO dispatching for an {@link IoExecutionContext}.
+ * Handles IO dispatching for an {@link IoExecutor}.
  * All operations except {@link #wakeup()} and {@link #isCompatible(Class)} <strong>MUST</strong> be executed
- * on the {@link IoExecutionContext} thread (which means {@link IoExecutionContext#inExecutionThread(Thread)} must
+ * on the {@link IoExecutor} thread (which means {@link IoExecutor#inExecutorThread(Thread)} must
  * return {@code true}) and should never be called from the user-directly.
  * <p>
  * Once a {@link IoHandle} is registered via the {@link #register(IoHandle)} method it's possible
@@ -36,14 +36,15 @@ public interface IoHandler {
     default void initialize() { }
 
     /**
-     * Run the IO handled by this {@link IoHandler}. The {@link IoExecutionContext} should be used
+     * Run the IO handled by this {@link IoHandler}. The {@link IoExecutorContext} should be used
      * to ensure we not execute too long and so block the processing of other task that are
-     * scheduled on the {@link IoExecutionContext}. This is done by taking {@link IoExecutionContext#delayNanos(long)}
-     * or {@link IoExecutionContext#deadlineNanos()} into account.
+     * scheduled on the {@link IoExecutor}. This is done by taking {@link IoExecutorContext#delayNanos(long)}
+     * or {@link IoExecutorContext#deadlineNanos()} into account.
      *
-     * @return the number of {@link IoHandle} for which I/O was handled.
+     * @param  context  the {@link IoExecutorContext}.
+     * @return          the number of {@link IoHandle} for which I/O was handled.
      */
-    int run();
+    int run(IoExecutorContext context);
 
     /**
      * Prepare to destroy this {@link IoHandler}. This method will be called before {@link #destroy()} and may be

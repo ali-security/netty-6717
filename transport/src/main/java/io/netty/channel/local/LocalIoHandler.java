@@ -15,7 +15,8 @@
  */
 package io.netty.channel.local;
 
-import io.netty.channel.IoExecutionContext;
+import io.netty.channel.IoExecutorContext;
+import io.netty.channel.IoExecutor;
 import io.netty.channel.IoHandle;
 import io.netty.channel.IoHandler;
 import io.netty.channel.IoHandlerFactory;
@@ -32,11 +33,11 @@ import java.util.concurrent.locks.LockSupport;
 
 public final class LocalIoHandler implements IoHandler {
     private final Set<LocalIoHandle> registeredChannels = new HashSet<LocalIoHandle>(64);
-    private final IoExecutionContext executionContext;
+    private final IoExecutor executor;
     private volatile Thread executionThread;
 
-    private LocalIoHandler(IoExecutionContext executionContext) {
-        this.executionContext = Objects.requireNonNull(executionContext, "executionContext");
+    private LocalIoHandler(IoExecutor executor) {
+        this.executor = Objects.requireNonNull(executor, "executor");
     }
 
     /**
@@ -54,20 +55,20 @@ public final class LocalIoHandler implements IoHandler {
     }
 
     @Override
-    public int run() {
+    public int run(IoExecutorContext context) {
         if (executionThread == null) {
             executionThread = Thread.currentThread();
         }
-        if (executionContext.canBlock()) {
+        if (context.canBlock()) {
             // Just block until there is a task ready to process or wakeup(...) is called.
-            LockSupport.parkNanos(this, executionContext.delayNanos(System.nanoTime()));
+            LockSupport.parkNanos(this, context.delayNanos(System.nanoTime()));
         }
         return 0;
     }
 
     @Override
     public void wakeup() {
-        if (!executionContext.inExecutionThread(Thread.currentThread())) {
+        if (!executor.inExecutorThread(Thread.currentThread())) {
             Thread thread = executionThread;
             if (thread != null) {
                 // Wakeup if we block at the moment.
@@ -92,7 +93,7 @@ public final class LocalIoHandler implements IoHandler {
     public IoRegistration register(IoHandle handle) {
         LocalIoHandle localHandle = cast(handle);
         if (registeredChannels.add(localHandle)) {
-            LocalIoRegistration registration = new LocalIoRegistration(executionContext, localHandle);
+            LocalIoRegistration registration = new LocalIoRegistration(executor, localHandle);
             localHandle.registerNow();
             return registration;
         }
@@ -106,13 +107,13 @@ public final class LocalIoHandler implements IoHandler {
 
     private final class LocalIoRegistration implements IoRegistration {
         private final Promise<?> cancellationPromise;
-        private final IoExecutionContext context;
+        private final IoExecutor executor;
         private final LocalIoHandle handle;
 
-        LocalIoRegistration(IoExecutionContext context, LocalIoHandle handle) {
-            this.context = context;
+        LocalIoRegistration(IoExecutor executor, LocalIoHandle handle) {
+            this.executor = executor;
             this.handle = handle;
-            this.cancellationPromise = context.newPromise();
+            this.cancellationPromise = executor.newPromise();
         }
 
         @Override
@@ -125,10 +126,10 @@ public final class LocalIoHandler implements IoHandler {
             if (!cancellationPromise.trySuccess(null)) {
                 return;
             }
-            if (context.inExecutionThread(Thread.currentThread())) {
+            if (executor.inExecutorThread(Thread.currentThread())) {
                 cancel0();
             } else {
-                context.execute(this::cancel0);
+                executor.execute(this::cancel0);
             }
         }
 

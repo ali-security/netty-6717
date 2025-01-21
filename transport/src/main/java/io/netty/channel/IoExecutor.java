@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 The Netty Project
+ * Copyright 2025 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -15,18 +15,21 @@
  */
 package io.netty.channel;
 
+import io.netty.util.concurrent.Promise;
+
+import java.util.concurrent.Executor;
+
 /**
- * A handle that can be registered to a {@link IoHandler}.
- * All methods must be called from the {@link IoExecutorContext} thread.
+ * An {@link Executor} that is used to drive IO of an {@link IoHandler}.
  */
-public interface IoHandle extends AutoCloseable {
+public interface IoExecutor extends Executor {
+    /**
+     * Return {@code true} if the given {@link Thread} is used by this {@link IoExecutor}.
+     */
+    boolean inExecutorThread(Thread thread);
 
     /**
-     * Be called once there is something to handle.
-     *
-     * @param registration  the {@link IoRegistration} for this {@link IoHandle}.
-     * @param ioEvent       the {@link IoEvent} that must be handled. The {@link IoEvent} is only valid
-     *                      while this method is executed and so must not escape it.
+     * Return a new {@link Promise}.
      */
-    void handle(IoRegistration registration, IoEvent ioEvent);
+    <V> Promise<V> newPromise();
 }

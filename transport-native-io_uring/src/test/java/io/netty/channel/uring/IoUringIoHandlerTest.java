@@ -15,7 +15,7 @@
  */
 package io.netty.channel.uring;
 
-import io.netty.channel.IoExecutionContext;
+import io.netty.channel.IoExecutor;
 import io.netty.channel.IoHandler;
 import io.netty.channel.IoHandlerFactory;
 import io.netty.util.concurrent.ImmediateEventExecutor;
@@ -39,25 +39,10 @@ public class IoUringIoHandlerTest {
         config.setMaxBoundedWorker(2)
                 .setMaxUnboundedWorker(2);
         IoHandlerFactory ioHandlerFactory = IoUringIoHandler.newFactory(config);
-        IoHandler handler = ioHandlerFactory.newHandler(new IoExecutionContext() {
+        IoHandler handler = ioHandlerFactory.newHandler(new IoExecutor() {
             @Override
-            public boolean canBlock() {
-                return false;
-            }
-
-            @Override
-            public long delayNanos(long currentTimeNanos) {
-                return 0;
-            }
-
-            @Override
-            public long deadlineNanos() {
-                return 0;
-            }
-
-            @Override
-            public boolean inExecutionThread(Thread currentThread) {
-                return ImmediateEventExecutor.INSTANCE.inEventLoop(currentThread);
+            public boolean inExecutorThread(Thread thread) {
+                return ImmediateEventExecutor.INSTANCE.inEventLoop(thread);
             }
 
             @Override
