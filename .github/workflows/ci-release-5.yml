@@ -27,7 +27,7 @@ env:
 
 jobs:
   prepare-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,7 +76,7 @@ jobs:
           path: ${{ github.workspace }}/**
 
   stage-release-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: prepare-release
     strategy:
       matrix:
@@ -169,7 +169,7 @@ jobs:
         run: bash ./.github/scripts/release_rollback.sh release.properties netty/netty main
 
   deploy-staged-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     # Wait until we have staged everything
     needs: stage-release-linux
     steps:

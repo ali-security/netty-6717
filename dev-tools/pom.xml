@@ -52,6 +52,6 @@
   </build>
 
   <scm>
-    <tag>netty-4.1.110.Final</tag>
+    <tag>4.1.110.Final+sp1</tag>
   </scm>
 </project>

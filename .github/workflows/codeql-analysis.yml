@@ -26,8 +26,6 @@ on:
   pull_request:
     # The branches below must be a subset of the branches above
     branches: ["4.1", main]
-  schedule:
-    - cron: '0 13 * * 3'
 
 env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryhandler.count=5 -Dmaven.wagon.httpconnectionManager.ttlSeconds=240
@@ -42,7 +40,7 @@ jobs:
       contents: read  # for actions/checkout to fetch code
       security-events: write  # for github/codeql-action/analyze to upload SARIF results
     name: Analyze
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     strategy:
       fail-fast: false
